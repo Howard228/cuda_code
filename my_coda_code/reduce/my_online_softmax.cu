@@ -1,5 +1,3 @@
-#include <__clang_cuda_builtin_vars.h>
-#include <__clang_cuda_runtime_wrapper.h>
 #include <cmath>
 #include <cuda_runtime.h>
 
@@ -21,13 +19,13 @@ void cpu_online_softmax(const float *x, float *y, int batch, int L) {
 }
 
 // cuda_online_softmax<<<batch, BLOCK_SIZE>>>
-void cuda_online_softmax(const float *x, float *y, int L) {
+__global__ void cuda_online_softmax(const float *x, float *y, int L) {
     int row = blockIdx.x;
     const int WARP_SIZE = 32;
     int tid = threadIdx.x;
     int lane = threadIdx.x % WARP_SIZE;
     int warp_id = threadIdx.x / WARP_SIZE;
-    int warp_num = blockDim.x / WARP_SIZE;
+    int warp_num = (blockDim.x + WARP_SIZE - 1) / WARP_SIZE;
     const float *x_row = x + row * L;
     float *y_row = y + row * L;
     float local_max = -INFINITY;
@@ -47,5 +45,19 @@ void cuda_online_softmax(const float *x, float *y, int L) {
     }
     __shared__ float s_sum[32];
     __shared__ float s_max[32];
-    
+    if (lane == 0) {
+        s_max[warp_id] = local_max;
+        s_sum[warp_id] = local_sum;
+    }
+    __syncthreads();
+    float row_max = -INFINITY;
+    float row_sum = 0.0f;
+    for (int i = 0; i < warp_num; ++i) {
+        float old_max = row_max;
+        row_max = fmaxf(s_max[i], row_max);
+        row_sum = s_sum[i] * expf(s_max[i] - row_max) + row_sum * expf(old_max - row_max);
+    }
+    for (int i = tid; i < L; i += blockDim.x) {
+        y_row[i] = expf(x_row[i] - row_max) / row_sum;
+    }
 }

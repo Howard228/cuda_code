@@ -136,8 +136,8 @@ int main() {
     for (int i = 0; i < nIter; i++) {
         CHECK_CUDA(cudaMemset(d_y, 0, bytes_y));
         col_reduce_horizontal<<<256, L>>>(d_x, d_y, batch, L);
-        //                    ↑    ↑
-        //               256个block  128线程/block
+        //                               ↑             ↑
+        //                           256个block  128线程/block
     }
     CHECK_CUDA(cudaEventRecord(stop));
     CHECK_CUDA(cudaEventSynchronize(stop));
