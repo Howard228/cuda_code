@@ -6,7 +6,6 @@
 // 每个线程负责一个位置，直接暴力累加前面所有元素
 __global__ void cuda_prefix_sum_naive(const float *input, float *output, const int L) {
     int tid = threadIdx.x;
-
     if (tid < L) {
         float sum = 0.0f;
         for (int i = 0; i <= tid; i++) {  // 从头加到自己
