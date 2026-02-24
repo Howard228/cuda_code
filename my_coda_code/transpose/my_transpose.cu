@@ -1,5 +1,21 @@
 #include <cuda_runtime.h>
 
+#define CEIL(a, b) (((a) + (b) - 1) / (b))
+
+// dim3 block(32, 32);
+// dim3 grid(CEIL(N, 32), CEIL(M, 32));
+// cuda_transpose_naive<<<grid, block>>>(input, output, M, N);
+__global__ void cuda_transpose_naive(float *input, float *output,
+                                     const int M, const int N) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;  // input的列
+    int row = blockIdx.y * blockDim.y + threadIdx.y;  // input的行
+
+    if (row < M && col < N) {
+        output[col * M + row] = input[row * N + col];
+        // B[col][row] = A[row][col]
+    }
+}
+
 // dim3 block(32, 32)
 // dim3 grid(CEIL(N, 32), CEIL(M, 32))
 // cuda_transpose<32><<<grid, block>>>

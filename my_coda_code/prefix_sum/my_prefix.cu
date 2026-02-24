@@ -2,6 +2,20 @@
 #include <cuda_runtime.h>
 
 
+// cuda_prefix_sum_naive<<<1, L>>>(input, output, L)
+// 每个线程负责一个位置，直接暴力累加前面所有元素
+__global__ void cuda_prefix_sum_naive(const float *input, float *output, const int L) {
+    int tid = threadIdx.x;
+
+    if (tid < L) {
+        float sum = 0.0f;
+        for (int i = 0; i <= tid; i++) {  // 从头加到自己
+            sum += input[i];
+        }
+        output[tid] = sum;
+    }
+}
+
 // cuda_prefix_sum<<<1, L / 2, L * sizeof(float)>>> 注意：L是pad后2的幂
 __global__ void cuda_prefix_sum(const float *input, float *output, const int L) {
     extern __shared__ float temp[];

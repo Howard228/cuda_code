@@ -1,5 +1,24 @@
 #include <cuda_runtime.h>
 
+// dim3 block(32, 32);                        // 每个block 32×32 = 1024个线程
+// dim3 grid(CEIL(N, 32), CEIL(M, 32));       // 按C的形状(M行N列)切块
+// sgemm_naive<<<grid, block>>>(d_A, d_B, d_C, M, N, K);
+__global__ void sgemm_naive(float *A, float *B, float *C,
+                            const int M, const int N, const int K) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;  // C的列
+    int row = blockIdx.y * blockDim.y + threadIdx.y;  // C的行
+
+    if (row < M && col < N) {
+        float sum = 0.0f;
+        for (int k = 0; k < K; k++) {
+            sum += A[row * K + k] * B[k * N + col];
+            //     A[row][k]        B[k][col]
+        }
+        C[row * N + col] = sum;
+    }
+}
+
+
 // dim3 grid(CEIL(N, BN), CEIL(M, BM))
 // dim3 block((BM * BN) / (TM * TN))
 // cuda_sgemm<BM, BN, BK, TM, TN><<<grid, block>>>
