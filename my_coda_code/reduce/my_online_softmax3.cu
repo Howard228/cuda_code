@@ -19,6 +19,31 @@ void cpu_online_softmax(const float* __restrict__ x, float* __restrict__ y,
     }
 }
 
+// 调用方式：cuda_online_softmax_naive<<<CEIL(batch, 256), 256>>>(x, y, batch, L);
+__global__ void cuda_online_softmax_naive(const float* __restrict__ x,
+                                          float* __restrict__ y,
+                                          const int batch, const int L) {
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row >= batch) return;
+
+    const float *x_row = x + row * L;
+    float *y_row = y + row * L;
+
+    // 1. 一次遍历：同时求 max 和 sum（Online 的核心）
+    float row_max = -INFINITY;
+    float row_sum = 0.0f;
+    for (int i = 0; i < L; ++i) {
+        float old_max = row_max;
+        row_max = fmaxf(row_max, x_row[i]);
+        row_sum = row_sum * expf(old_max - row_max) + expf(x_row[i] - row_max);
+    }
+
+    // 2. 归一化
+    for (int i = 0; i < L; ++i) {
+        y_row[i] = expf(x_row[i] - row_max) / row_sum;
+    }
+}
+
 // cuda_online_softmax<<<batch, BLOCK_SIZE>>>
 __global__ void cuda_online_softmax(const float* __restrict__ x, 
                                     float* __restrict__ y,
@@ -40,7 +65,7 @@ __global__ void cuda_online_softmax(const float* __restrict__ x,
     }
     #pragma unroll
     for (int offset = WARP_SIZE >> 1; offset > 0; offset >>= 1) {
-        float other_max = __shfl_xor_sync(0xFFFFFFFF, local_max, offset);
+        float other_max = __shfl_xor_sync(0xFFFFFFFF, local_max, offset); // CUDA Warp Shuffle指令
         float other_sum = __shfl_xor_sync(0xFFFFFFFF, local_sum, offset);
         float new_max = fmaxf(other_max, local_max);
         local_sum = other_sum * expf(other_max - new_max) + local_sum * expf(local_max - new_max);
