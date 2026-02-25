@@ -1,4 +1,3 @@
-#include <__clang_cuda_builtin_vars.h>
 #include <cuda_runtime.h>
 
 // col_sum_reduce<<<block_num, L>>>
