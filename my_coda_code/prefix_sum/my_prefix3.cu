@@ -1,24 +1,24 @@
+#include <__clang_cuda_builtin_vars.h>
 #include <cuda_runtime.h>
 
+
 // cuda_prefix_sum_naive<<<1, L>>>
-__global__ void cuda_prefix_sum_naive(const float *input, float *output, const int L) {
-    int tid = threadIdx.x;
-    if (tid >= L) return;
+__global__ void cuda_prefix_sum_naive(const float *input, float *output) {
     float sum = 0.0f;
-    for (int i = 0; i <= tid; ++i) {
+    for (int i = 0; i <= threadIdx.x; ++i) {
         sum += input[i];
     }
-    output[tid] = sum;
+    output[threadIdx.x] = sum;
 }
 
-// cuda_prefix_sum<<<1, L / 2, L * sizeof(float)>>>  L是经过pad末尾添0后成2的幂次方
+
+
+// cuda_prefix_sum<<<1, L / 2, L * sizeof(float)>>>
 __global__ void cuda_prefix_sum(const float *input, float *output, const int L) {
     extern __shared__ float s_mem[];
     int tid = threadIdx.x;
-    int idx1 = tid * 2;
-    int idx2 = tid * 2 + 1;
-    if (idx1 < L) s_mem[idx1] = input[idx1];
-    if (idx2 < L) s_mem[idx2] = input[idx2];
+    if (tid * 2 < L) s_mem[tid * 2] = input[tid * 2];
+    if (tid * 2 + 1 < L) s_mem[tid * 2 + 1] = input[tid * 2 + 1];
     int offset = 1;
     for (int valid_thread_num = L >> 1; valid_thread_num > 0; valid_thread_num >>= 1) {
         if (tid < valid_thread_num) {
@@ -29,7 +29,7 @@ __global__ void cuda_prefix_sum(const float *input, float *output, const int L) 
         offset <<= 1;
         __syncthreads();
     }
-    if (tid == 0) s_mem[L - 1] = 0.0f;
+    if (tid == 0) s_mem[L - 1] = 0;
     __syncthreads();
     for (int valid_thread_num = 1; valid_thread_num < L; valid_thread_num <<= 1) {
         if (tid < valid_thread_num) {
@@ -42,6 +42,6 @@ __global__ void cuda_prefix_sum(const float *input, float *output, const int L) 
         offset >>= 1;
         __syncthreads();
     }
-    if (idx1 < L) output[idx1] = s_mem[idx1] + input[idx1];
-    if (idx2 < L) output[idx2] = s_mem[idx2] + input[idx2];
-}
+    if (tid * 2 < L) output[tid * 2] = input[tid * 2] + s_mem[tid * 2];
+    if (tid * 2 + 1 < L) output[tid * 2 + 1] = input[tid * 2 + 1] + s_mem[tid * 2 + 1];
+} 
